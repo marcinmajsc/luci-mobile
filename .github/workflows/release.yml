@@ -24,6 +24,7 @@ jobs:
         #3 Setup Flutter
       - name: Install Dependencies
         run: |
+          brew update
           brew install make ldid
           brew install --cask flutter
 
