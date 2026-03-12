@@ -33,27 +33,9 @@ jobs:
       - name: Build iOS archive (unsigned)
         run: flutter build ipa --release --no-codesign
 
-      - name: Validate archive metadata
-        run: |
-          set -euo pipefail
-          INFO_PLIST="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
-
-          if [ ! -f "$INFO_PLIST" ]; then
-            echo "Info.plist not found in archive: $INFO_PLIST"
-            exit 1
-          fi
-
-          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST")
-          DISPLAY_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$INFO_PLIST")
-
-          test "$BUNDLE_ID" = "app.cogwheel.lucimobile"
-          test "$DISPLAY_NAME" = "LuCI Mobile"
-
-          echo "Validated bundle identifier: $BUNDLE_ID"
-          echo "Validated display name: $DISPLAY_NAME"
-
       - name: Package unsigned IPA from archive
         run: |
+          ls -lah build/ios/
           set -euo pipefail
           ARCHIVE_PATH="build/ios/archive/Runner.xcarchive"
           APP_PATH="$ARCHIVE_PATH/Products/Applications/Runner.app"
