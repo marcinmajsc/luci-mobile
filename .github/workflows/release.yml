@@ -14,6 +14,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Extract app version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | head -n 1 | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
+          echo "Version: $VERSION"
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
         #2 Setup Java
       - name: Set Up Java
         uses: actions/setup-java@v4
