@@ -95,8 +95,8 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.20.0
         with:
           artifacts: "build/ios/ipa/Runner-unsigned.ipa"
-          tag: ${{ github.ref_name }}
+          commit: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
