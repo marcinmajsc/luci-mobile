@@ -18,7 +18,7 @@ jobs:
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | head -n 1 | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
           echo "Version: $VERSION"
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "APP_VERSION=v$VERSION" >> $GITHUB_ENV
 
         #2 Setup Java
       - name: Set Up Java
