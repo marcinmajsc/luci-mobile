@@ -104,6 +104,6 @@ jobs:
         uses: ncipollo/release-action@v1.20.0
         with:
           artifacts: "build/ios/ipa/Runner-unsigned.ipa"
-          tag: ${{ github.ref_name }}
+          tag: ${{ env.APP_VERSION }}
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
