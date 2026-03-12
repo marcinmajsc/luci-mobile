@@ -35,8 +35,32 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
       
-      - name: Build iOS (unsigned IPA)
+      - name: Build iOS archive (unsigned)
         run: flutter build ipa --release --no-codesign
+
+      - name: Package unsigned IPA from archive
+        run: |
+          set -euo pipefail
+          ARCHIVE_PATH="build/ios/archive/Runner.xcarchive"
+          APP_PATH="$ARCHIVE_PATH/Products/Applications/Runner.app"
+          IPA_DIR="build/ios/ipa"
+          PAYLOAD_DIR="build/ios/unsigned/Payload"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Runner.app not found in archive: $APP_PATH"
+            exit 1
+          fi
+
+          rm -rf "build/ios/unsigned"
+          mkdir -p "$PAYLOAD_DIR" "$IPA_DIR"
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/"
+
+          (
+            cd "build/ios/unsigned"
+            /usr/bin/zip -qry "../ipa/Runner-unsigned.ipa" Payload
+          )
+
+          echo "Created unsigned IPA: $IPA_DIR/Runner-unsigned.ipa"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
