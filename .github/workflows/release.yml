@@ -41,7 +41,6 @@ jobs:
 
       - name: Package unsigned IPA from archive
         run: |
-          ls -lah build/ios/
           set -euo pipefail
           ARCHIVE_PATH="build/ios/archive/Runner.xcarchive"
           APP_PATH="$ARCHIVE_PATH/Products/Applications/Runner.app"
