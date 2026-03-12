@@ -7,7 +7,7 @@ on:
 jobs:  
   build-android:      
     name: Build iOS 
-    runs-on: ubuntu-latest
+    runs-on: macos-26
 
     steps:
         #1 Checkout Repository
@@ -22,25 +22,17 @@ jobs:
           java-version: '21'
 
         #3 Setup Flutter
-      - name: Set Up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.35.2'
-          channel: 'stable'
+      - name: Install Dependencies
+        run: |
+          brew install make ldid
+          brew install --cask flutter
+
+      - name: Set PATH environment variable
+        run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
 
         #4 Install Dependencies
       - name: Install Dependencies
         run: flutter pub get
-
-        #5 Setup Keystore
-      - name: Create Keystore
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > app/luci_mobile_keystore.jks
-          echo "${{ secrets.ANDROID_KEY_PROPERTIES_BASE64 }}" | base64 --decode > key.properties
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEY_PROPERTIES_BASE64: ${{ secrets.ANDROID_KEY_PROPERTIES_BASE64 }}
-        working-directory: android
       
       - name: Build iOS
         run: flutter build ios
