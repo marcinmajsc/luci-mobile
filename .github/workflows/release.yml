@@ -104,5 +104,6 @@ jobs:
         with:
           artifacts: "build/ios/ipa/Runner-unsigned.ipa"
           tag: ${{ env.APP_VERSION }}
+          commit: ${{ github.ref_name }}
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
