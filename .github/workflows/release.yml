@@ -48,7 +48,7 @@ jobs:
       - name: Build iOS archive (unsigned)
         run: |
           if [ -n "${{ inputs.version }}" ]; then
-            flutter build ipa --release --no-codesign --build-number ${{ inputs.version }}
+            flutter build ipa --release --no-codesign --build-name ${{ inputs.version }}
           else
             flutter build ipa --release --no-codesign
           fi
