@@ -81,4 +81,6 @@ jobs:
         with:
           artifacts: "build/app/outputs/flutter-apk/app-release.apk,build/app/outputs/bundle/release/app-release.aab"
           tag: ${{ github.ref_name }}
+          commit: ${{ github.ref_name }}
+          allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
