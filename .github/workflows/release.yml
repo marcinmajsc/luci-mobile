@@ -2,6 +2,11 @@ name: Release iOS
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Set App Version (optional)"
+        type: string
+        required: false
 
 
 jobs:  
@@ -16,10 +21,14 @@ jobs:
 
       - name: Extract app version
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | head -n 1 | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
-          echo "Version: $VERSION"
-          echo "APP_VERSION=v$VERSION" >> $GITHUB_ENV
-
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "Using input version"
+            echo "APP_VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | head -n 1 | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
+            echo "Version: $VERSION"
+            echo "APP_VERSION=v$VERSION" >> $GITHUB_ENV
+          fi
         #2 Setup Java
       - name: Set Up Java
         uses: actions/setup-java@v4
@@ -37,7 +46,12 @@ jobs:
         run: flutter pub get
       
       - name: Build iOS archive (unsigned)
-        run: flutter build ipa --release --no-codesign
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            flutter build ipa --release --no-codesign --build-number ${{ inputs.version }}
+          else
+            flutter build ipa --release --no-codesign
+          fi
 
       - name: Package unsigned IPA from archive
         run: |
