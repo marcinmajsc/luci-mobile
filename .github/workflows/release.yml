@@ -1,7 +1,12 @@
 name: Release
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
+     inputs:
+      version:
+        description: "Set App Version (optional)"
+        type: string
+        required: false
 
 jobs:  
   build-android:      
@@ -12,6 +17,17 @@ jobs:
         #1 Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Extract app version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "Using input version"
+            echo "APP_VERSION=v${{ inputs.version }}" >> $GITHUB_ENV
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | head -n 1 | sed 's/version:[[:space:]]*//' | cut -d+ -f1)
+            echo "Version: $VERSION"
+            echo "APP_VERSION=v$VERSION" >> $GITHUB_ENV
+          fi
 
         #2 Setup Java
       - name: Set Up Java
@@ -42,10 +58,20 @@ jobs:
         working-directory: android
       
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            flutter build apk --release --build-name ${{ inputs.version }}
+          else
+            flutter build apk --release
+          fi
 
       - name: Build appBundle
-        run: flutter build appbundle --release
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            flutter build appbundle --release --build-name ${{ inputs.version }}
+          else
+            flutter build appbundle --release
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -80,7 +106,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           artifacts: "build/app/outputs/flutter-apk/app-release.apk,build/app/outputs/bundle/release/app-release.aab"
-          tag: ${{ github.ref_name }}
+          tag: ${{ env.APP_VERSION }}
           commit: ${{ github.ref_name }}
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
