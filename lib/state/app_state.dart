@@ -569,6 +569,13 @@ class AppState extends ChangeNotifier {
         params: {},
       );
 
+      // UCI wireless config is optional — wired-only routers may not have it
+      final uciWirelessFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'wireless'},
+      );
+
       final results = await Future.wait([
         _apiService!.call(
           ip,
@@ -610,14 +617,6 @@ class AppState extends ChangeNotifier {
           method: 'getDHCPLeases',
           params: {},
         ),
-        _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'uci',
-          method: 'get',
-          params: {'config': 'wireless'},
-        ),
       ]);
 
       // Helper to safely extract data and handle errors from LuCI's [status, data] responses
@@ -651,16 +650,26 @@ class AppState extends ChangeNotifier {
       final networkData = getData(results[2]) as Map<String, dynamic>?;
       final interfaceDump = getData(results[3]) as Map<String, dynamic>?;
       final dhcpLeases = getData(results[4]) as Map<String, dynamic>?;
-      final uciWirelessConfig = getData(results[5]);
+
+      // Await optional wireless futures in parallel (won't throw — wired-only routers are fine)
+      final optionalResults =
+          await Future.wait([wirelessFuture, uciWirelessFuture]);
+      final wirelessRaw = optionalResults[0];
+      final uciWirelessRaw = optionalResults[1];
 
       Map<String, dynamic>? wirelessData;
-      final wirelessRaw = await wirelessFuture;
       if (wirelessRaw != null) {
         final parsedWireless =
             getOptionalData(wirelessRaw, 'luci-rpc.getWirelessDevices');
         if (parsedWireless is Map<String, dynamic>) {
           wirelessData = parsedWireless;
         }
+      }
+
+      dynamic uciWirelessConfig;
+      if (uciWirelessRaw != null) {
+        uciWirelessConfig =
+            getOptionalData(uciWirelessRaw, 'uci.get wireless');
       }
 
       // Fetch WireGuard peer information for WireGuard interfaces
@@ -1332,16 +1341,23 @@ class AppState extends ChangeNotifier {
         final client = Client.fromLease(lease);
         final macNorm = client.macAddress.toUpperCase().replaceAll('-', ':');
         final isWireless = normalizedWireless.contains(macNorm);
-        final enriched = client.copyWith(
-          connectionType:
-              isWireless ? ConnectionType.wireless : ConnectionType.wired,
-        );
+        // If confirmed wireless by assoclist, mark wireless; otherwise keep heuristic
+        final enriched = isWireless
+            ? client.copyWith(connectionType: ConnectionType.wireless)
+            : client;
         // Prefer entries that have more info (hostname length as heuristic)
         if (!clients.containsKey(macNorm) ||
             (enriched.hostname.isNotEmpty &&
                 enriched.hostname.length >
                     (clients[macNorm]?.hostname.length ?? 0))) {
           clients[macNorm] = enriched;
+        }
+      }
+
+      // Add wireless stations not in DHCP leases (AP-mode fallback)
+      for (final mac in normalizedWireless) {
+        if (!clients.containsKey(mac)) {
+          clients[mac] = Client.fromWirelessStation(mac);
         }
       }
 
@@ -1393,14 +1409,43 @@ class AppState extends ChangeNotifier {
                 .cast<Map<String, dynamic>>(),
           );
         }
-        return leases.map((l) {
+        // Normalize wireless MACs for consistent lookup
+        final normalizedMacs = macs
+            .map((m) => m.toUpperCase().replaceAll('-', ':'))
+            .toSet();
+        final clientMap = <String, Client>{};
+        for (final l in leases) {
           final c = Client.fromLease(l);
-          final isWireless = macs.contains(c.macAddress.toLowerCase());
-          return c.copyWith(
-            connectionType:
-                isWireless ? ConnectionType.wireless : ConnectionType.wired,
-          );
-        }).toList();
+          final macNorm = c.macAddress.toUpperCase().replaceAll('-', ':');
+          final isWireless = normalizedMacs.contains(macNorm);
+          clientMap[macNorm] = isWireless
+              ? c.copyWith(connectionType: ConnectionType.wireless)
+              : c;
+        }
+        // Add wireless stations not in DHCP leases (AP-mode fallback)
+        for (final mac in normalizedMacs) {
+          if (!clientMap.containsKey(mac)) {
+            clientMap[mac] = Client.fromWirelessStation(mac);
+          }
+        }
+        final reviewerClients = clientMap.values.toList();
+        reviewerClients.sort((a, b) {
+          int typeOrder(ConnectionType t) {
+            switch (t) {
+              case ConnectionType.wireless:
+                return 0;
+              case ConnectionType.wired:
+                return 1;
+              default:
+                return 2;
+            }
+          }
+          final cmpType =
+              typeOrder(a.connectionType).compareTo(typeOrder(b.connectionType));
+          if (cmpType != 0) return cmpType;
+          return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
+        });
+        return reviewerClients;
       }
 
       if (_routerService?.selectedRouter == null || _authService?.sysauth == null) {
@@ -1435,13 +1480,29 @@ class AppState extends ChangeNotifier {
         );
       }
 
-      final clients = leases.map((l) {
+      // Normalize wireless MACs for consistent lookup
+      final normalizedWireless = wireless
+          .map((m) => m.toUpperCase().replaceAll('-', ':'))
+          .toSet();
+
+      final clientMap = <String, Client>{};
+      for (final l in leases) {
         final c = Client.fromLease(l);
-        final isWireless = wireless.contains(c.macAddress.toLowerCase());
-        return c.copyWith(
-          connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
-        );
-      }).toList();
+        final macNorm = c.macAddress.toUpperCase().replaceAll('-', ':');
+        final isWireless = normalizedWireless.contains(macNorm);
+        clientMap[macNorm] = isWireless
+            ? c.copyWith(connectionType: ConnectionType.wireless)
+            : c;
+      }
+
+      // Add wireless stations not in DHCP leases (AP-mode fallback)
+      for (final mac in normalizedWireless) {
+        if (!clientMap.containsKey(mac)) {
+          clientMap[mac] = Client.fromWirelessStation(mac);
+        }
+      }
+
+      final clients = clientMap.values.toList();
 
       // Sort similar to aggregated
       clients.sort((a, b) {
